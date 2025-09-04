@@ -1,37 +1,106 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Instagram Lead Generator</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 20px; display: flex; }
-    #inputSection { width: 300px; margin-right: 20px; }
-    #results { flex: 1; }
-    #keywordHistory { background-color: #ffc0cb; padding: 10px; list-style: none; max-height: 200px; overflow-y: auto; }
-    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
-    th, td { border: 1px solid #ddd; padding: 8px; color: black; }
-    th { background-color: #98ff98; }
-    #downloadBtn { margin-top: 10px; display: none; }
-    input, textarea { width: 100%; margin-top: 5px; padding: 5px; background-color: #cce5ff; border: 1px solid #007bff; }
-    button { margin-top: 10px; background-color: #007bff; color: white; padding: 8px; border: none; cursor: pointer; }
-  </style>
-</head>
-<body>
+async function generateLeads() {
+    const apiKey = document.getElementById('apiKeyInput').value.trim();
+    const cseId = document.getElementById('cseIdInput').value.trim();
+    const keyword = document.getElementById('keywordInput').value.trim();
 
-<div id="inputSection">
-  <h3>Instagram Lead Generator</h3>
-  <input id="apiKeyInput" placeholder="Enter API Key(s), comma separated">
-  <input id="cseIdInput" placeholder="Enter Custom Search Engine ID">
-  <textarea id="keywordInput" placeholder="Enter hashtag or keyword"></textarea>
-  <button onclick="generateLeads()">Generate Leads</button>
+    const leadsTableDiv = document.getElementById('leadsTable');
+    const totalLeadsDiv = document.getElementById('totalLeads');
 
-  <h4>Search History</h4>
-  <ul id="keywordHistory"></ul>
+    // Remove any previous download button
+    const oldDownloadBtn = document.getElementById('downloadCsvBtn');
+    if (oldDownloadBtn) oldDownloadBtn.remove();
 
-  <button id="downloadBtn" onclick="downloadExcel()">Download to Excel</button>
-</div>
+    if (!apiKey || !cseId || !keyword) {
+        leadsTableDiv.innerHTML = '<div class="error">Please enter API Key, CSE ID, and hashtag/keyword.</div>';
+        totalLeadsDiv.textContent = 'Total Leads: 0';
+        return;
+    }
 
-<div id="results"></div>
+    leadsTableDiv.innerHTML = 'Searching...';
 
-<script src="script.js"></script>
-</body>
-</html>
+    try {
+        const query = encodeURIComponent(keyword + ' site:instagram.com');
+        const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cseId}&q=${query}&num=10`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.error) {
+            leadsTableDiv.innerHTML = `<div class="error">API Error: ${data.error.message}</div>`;
+            totalLeadsDiv.textContent = 'Total Leads: 0';
+            return;
+        }
+
+        if (!data.items || data.items.length === 0) {
+            leadsTableDiv.innerHTML = '<div>No results found.</div>';
+            totalLeadsDiv.textContent = 'Total Leads: 0';
+            return;
+        }
+
+        const table = document.createElement('table');
+        const headerRow = table.insertRow();
+        headerRow.innerHTML = '<th>Username</th><th>Profile Link</th>';
+
+        const usernames = new Set();
+
+        data.items.forEach(item => {
+            const link = item.link;
+            const match = link.match(/instagram\.com\/([a-zA-Z0-9._]+)/);
+            if (match && !usernames.has(match[1])) {
+                usernames.add(match[1]);
+                const row = table.insertRow();
+                row.innerHTML = `<td>${match[1]}</td><td><a href="${link}" target="_blank">${link}</a></td>`;
+            }
+        });
+
+        leadsTableDiv.innerHTML = '';
+        leadsTableDiv.appendChild(table);
+        totalLeadsDiv.textContent = 'Total Leads: ' + usernames.size;
+
+        // Add download CSV button
+        if (usernames.size > 0) {
+            const downloadBtn = document.createElement('button');
+            downloadBtn.id = 'downloadCsvBtn';
+            downloadBtn.textContent = 'Download CSV';
+            downloadBtn.style.backgroundColor = 'skyblue';
+            downloadBtn.style.padding = '8px';
+            downloadBtn.style.border = 'none';
+            downloadBtn.style.cursor = 'pointer';
+            downloadBtn.style.marginTop = '10px';
+            downloadBtn.onclick = () => downloadCSV(usernames);
+            leadsTableDiv.appendChild(downloadBtn);
+        }
+
+        // Update keyword history
+        const history = document.getElementById('keywordHistory');
+        const li = document.createElement('li');
+        li.textContent = keyword;
+        history.appendChild(li);
+
+    } catch (err) {
+        leadsTableDiv.innerHTML = `<div class="error">Error fetching data: ${err.message}</div>`;
+        totalLeadsDiv.textContent = 'Total Leads: 0';
+    }
+}
+
+// Function to download CSV
+function downloadCSV(usernamesSet) {
+    const csvRows = [];
+    csvRows.push(['Username', 'Profile Link']); // header row
+
+    usernamesSet.forEach(username => {
+        const profileLink = `https://instagram.com/${username}`;
+        csvRows.push([username, profileLink]);
+    });
+
+    const csvContent = csvRows.map(e => e.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'instagram_leads.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
