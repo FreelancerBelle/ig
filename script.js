@@ -19,7 +19,12 @@ function generateLeads() {
   addKeywordToHistory(input);
 
   leads = [];
-  const usernames = input.split(/\r?\n/).map(u => u.trim()).filter(u => u !== "");
+
+  // Split input by newlines or commas, trim whitespace
+  const usernames = input
+    .split(/[\r\n,]+/)
+    .map(u => u.trim())
+    .filter(u => u !== "");
 
   usernames.forEach(username => {
     const profileLink = `https://www.instagram.com/${username}/`;
