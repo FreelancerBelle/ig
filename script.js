@@ -1,17 +1,25 @@
 async function generateLeads() {
     const apiKey = document.getElementById('apiKeyInput').value.trim();
     const cseId = document.getElementById('cseIdInput').value.trim();
-    const keyword = document.getElementById('keywordInput').value.trim();
+    const keywordInput = document.getElementById('keywordInput').value.trim();
 
     const leadsTableDiv = document.getElementById('leadsTable');
     const totalLeadsDiv = document.getElementById('totalLeads');
 
-    // Remove any previous download button
+    // Remove previous download button if exists
     const oldDownloadBtn = document.getElementById('downloadCsvBtn');
     if (oldDownloadBtn) oldDownloadBtn.remove();
 
-    if (!apiKey || !cseId || !keyword) {
-        leadsTableDiv.innerHTML = '<div class="error">Please enter API Key, CSE ID, and hashtag/keyword.</div>';
+    if (!apiKey || !cseId || !keywordInput) {
+        leadsTableDiv.innerHTML = '<div class="error">Please enter API Key, CSE ID, and at least one keyword.</div>';
+        totalLeadsDiv.textContent = 'Total Leads: 0';
+        return;
+    }
+
+    // Split keywords by comma
+    const keywords = keywordInput.split(',').map(k => k.trim()).filter(k => k.length > 0);
+    if (keywords.length === 0) {
+        leadsTableDiv.innerHTML = '<div class="error">Please enter valid keywords.</div>';
         totalLeadsDiv.textContent = 'Total Leads: 0';
         return;
     }
@@ -20,38 +28,46 @@ async function generateLeads() {
 
     const usernames = new Set();
     const batchSize = 10; // max results per API request
-    let startIndex = 1;
-    let moreResults = true;
 
     try {
-        while (moreResults && startIndex <= 91) { // max start = 91 to keep total <=100
-            const query = encodeURIComponent(keyword + ' site:instagram.com');
-            const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cseId}&q=${query}&num=${batchSize}&start=${startIndex}`;
+        for (const keyword of keywords) {
+            let startIndex = 1;
+            let moreResults = true;
 
-            const response = await fetch(url);
-            const data = await response.json();
+            while (moreResults && startIndex <= 91) { // max start = 91 to stay <=100 results
+                const query = encodeURIComponent(`${keyword} site:instagram.com`);
+                const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cseId}&q=${query}&num=${batchSize}&start=${startIndex}`;
 
-            if (data.error) {
-                leadsTableDiv.innerHTML = `<div class="error">API Error: ${data.error.message}</div>`;
-                return;
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.error) {
+                    leadsTableDiv.innerHTML = `<div class="error">API Error: ${data.error.message}</div>`;
+                    return;
+                }
+
+                if (!data.items || data.items.length === 0) {
+                    moreResults = false;
+                    break;
+                }
+
+                data.items.forEach(item => {
+                    const link = item.link;
+                    const match = link.match(/instagram\.com\/([a-zA-Z0-9._]+)/);
+                    if (match) usernames.add(match[1]);
+                });
+
+                startIndex += batchSize;
             }
 
-            if (!data.items || data.items.length === 0) {
-                moreResults = false;
-                break;
-            }
-
-            data.items.forEach(item => {
-                const link = item.link;
-                const match = link.match(/instagram\.com\/([a-zA-Z0-9._]+)/);
-                if (match) usernames.add(match[1]);
-            });
-
-            // Move to next page
-            startIndex += batchSize;
+            // Add keyword to search history
+            const history = document.getElementById('keywordHistory');
+            const li = document.createElement('li');
+            li.textContent = keyword;
+            history.appendChild(li);
         }
 
-        // Build table
+        // Build the table
         if (usernames.size === 0) {
             leadsTableDiv.innerHTML = '<div>No results found.</div>';
             totalLeadsDiv.textContent = 'Total Leads: 0';
@@ -69,7 +85,7 @@ async function generateLeads() {
             leadsTableDiv.appendChild(table);
             totalLeadsDiv.textContent = 'Total Leads: ' + usernames.size;
 
-            // Add download CSV button
+            // Add CSV download button
             const downloadBtn = document.createElement('button');
             downloadBtn.id = 'downloadCsvBtn';
             downloadBtn.textContent = 'Download CSV';
@@ -82,22 +98,16 @@ async function generateLeads() {
             leadsTableDiv.appendChild(downloadBtn);
         }
 
-        // Update keyword history
-        const history = document.getElementById('keywordHistory');
-        const li = document.createElement('li');
-        li.textContent = keyword;
-        history.appendChild(li);
-
     } catch (err) {
         leadsTableDiv.innerHTML = `<div class="error">Error fetching data: ${err.message}</div>`;
         totalLeadsDiv.textContent = 'Total Leads: 0';
     }
 }
 
-// Function to download CSV
+// CSV download function
 function downloadCSV(usernamesSet) {
     const csvRows = [];
-    csvRows.push(['Username', 'Profile Link']); // header row
+    csvRows.push(['Username', 'Profile Link']);
 
     usernamesSet.forEach(username => {
         const profileLink = `https://instagram.com/${username}`;
