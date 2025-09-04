@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Instagram Lead Generator</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; display: flex; }
+    #inputSection { width: 300px; margin-right: 20px; }
+    #results { flex: 1; }
+    #keywordHistory { background-color: #ffc0cb; padding: 10px; list-style: none; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    th, td { border: 1px solid #ddd; padding: 8px; color: black; }
+    th { background-color: #98ff98; }
+    #downloadBtn { margin-top: 10px; display: none; }
+    textarea { width: 100%; height: 100px; }
+    button { margin-top: 10px; background-color: #007bff; color: white; padding: 8px; border: none; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+<div id="inputSection">
+  <h3>Instagram Lead Generator</h3>
+  <textarea id="usernameInput" placeholder="Paste usernames or hashtags here, one per line"></textarea>
+  <button onclick="generateLeads()">Generate Leads</button>
+
+  <h4>Search History</h4>
+  <ul id="keywordHistory"></ul>
+
+  <button id="downloadBtn" onclick="downloadExcel()">Download to Excel</button>
+</div>
+
+<div id="results"></div>
+
+<!-- Link to external JS -->
+<script src="script.js"></script>
+</body>
+</html>
