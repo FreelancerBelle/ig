@@ -3,35 +3,154 @@
 <head>
   <title>Instagram Lead Generator</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 20px; display: flex; }
-    #inputSection { width: 300px; margin-right: 20px; }
-    #results { flex: 1; }
-    #keywordHistory { background-color: #ffc0cb; padding: 10px; list-style: none; max-height: 200px; overflow-y: auto; }
-    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
-    th, td { border: 1px solid #ddd; padding: 8px; color: black; }
+    body { 
+      font-family: Arial, sans-serif; 
+      margin: 0; 
+      padding: 20px; 
+      display: flex; 
+      background-color: #f2f2f2;
+    }
+
+    /* Left panel */
+    #inputSection { 
+      width: 300px; 
+      margin-right: 20px; 
+    }
+
+    /* Input boxes */
+    #apiKeyInput { background-color: pink; padding: 8px; border: 1px solid #000; width: 100%; margin-bottom: 10px; }
+    #cseIdInput { background-color: violet; padding: 8px; border: 1px solid #000; width: 100%; margin-bottom: 10px; }
+    #keywordInput { background-color: yellowgreen; padding: 8px; border: 1px solid #000; width: 100%; margin-bottom: 10px; }
+    #generateBtn { background-color: yellow; padding: 10px; border: none; width: 100%; cursor: pointer; font-weight: bold; }
+
+    h4 { margin-top: 20px; }
+
+    /* Keyword history */
+    #keywordHistory { 
+      background-color: brown; 
+      color: white; 
+      padding: 10px; 
+      list-style: none; 
+      max-height: 200px; 
+      overflow-y: auto; 
+      margin-top: 10px;
+    }
+
+    /* Right panel */
+    #results { 
+      flex: 1; 
+      background-color: white; 
+      padding: 10px; 
+      border: 1px solid #ccc; 
+      overflow-x: auto; 
+    }
+
+    table { 
+      border-collapse: collapse; 
+      width: 100%; 
+      margin-top: 10px; 
+    }
+    th, td { 
+      border: 1px solid #ddd; 
+      padding: 8px; 
+      color: black; 
+      text-align: left;
+    }
     th { background-color: #98ff98; }
-    #downloadBtn { margin-top: 10px; display: none; }
-    input, textarea { width: 100%; margin-top: 5px; padding: 5px; background-color: #cce5ff; border: 1px solid #007bff; }
-    button { margin-top: 10px; background-color: #007bff; color: white; padding: 8px; border: none; cursor: pointer; }
+
+    #totalLeads { 
+      font-weight: bold; 
+      text-align: right; 
+      margin-bottom: 5px; 
+    }
+
+    /* Red error messages */
+    .error { color: red; font-weight: bold; margin-top: 10px; }
   </style>
 </head>
 <body>
 
-<div id="inputSection">
-  <h3>Instagram Lead Generator</h3>
-  <input id="apiKeyInput" placeholder="Enter API Key(s), comma separated">
-  <input id="cseIdInput" placeholder="Enter Custom Search Engine ID">
-  <textarea id="keywordInput" placeholder="Enter hashtag or keyword"></textarea>
-  <button onclick="generateLeads()">Generate Leads</button>
+  <div id="inputSection">
+    <h3>Instagram Lead Generator</h3>
+    <input id="apiKeyInput" placeholder="Enter API Key">
+    <input id="cseIdInput" placeholder="Enter Custom Search Engine ID">
+    <input id="keywordInput" placeholder="Enter hashtag/keyword">
+    <button id="generateBtn" onclick="generateLeads()">Generate Leads</button>
 
-  <h4>Search History</h4>
-  <ul id="keywordHistory"></ul>
+    <h4>Search History</h4>
+    <ul id="keywordHistory"></ul>
+  </div>
 
-  <button id="downloadBtn" onclick="downloadExcel()">Download to Excel</button>
-</div>
+  <div id="results">
+    <div id="totalLeads">Total Leads: 0</div>
+    <div id="leadsTable"></div>
+  </div>
 
-<div id="results"></div>
+<script>
+async function generateLeads() {
+    const apiKey = document.getElementById('apiKeyInput').value.trim();
+    const cseId = document.getElementById('cseIdInput').value.trim();
+    const keyword = document.getElementById('keywordInput').value.trim();
 
-<script src="script.js"></script>
+    const leadsTableDiv = document.getElementById('leadsTable');
+    const totalLeadsDiv = document.getElementById('totalLeads');
+
+    if (!apiKey || !cseId || !keyword) {
+        leadsTableDiv.innerHTML = '<div class="error">Please enter API Key, CSE ID, and hashtag/keyword.</div>';
+        return;
+    }
+
+    leadsTableDiv.innerHTML = 'Searching...';
+
+    try {
+        const query = encodeURIComponent(keyword + ' site:instagram.com');
+        const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cseId}&q=${query}&num=10`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.error) {
+            leadsTableDiv.innerHTML = `<div class="error">API Error: ${data.error.message}</div>`;
+            return;
+        }
+
+        if (!data.items || data.items.length === 0) {
+            leadsTableDiv.innerHTML = '<div>No results found.</div>';
+            totalLeadsDiv.textContent = 'Total Leads: 0';
+            return;
+        }
+
+        const table = document.createElement('table');
+        const headerRow = table.insertRow();
+        headerRow.innerHTML = '<th>Username</th><th>Profile Link</th>';
+
+        const usernames = new Set();
+
+        data.items.forEach(item => {
+            const link = item.link;
+            const match = link.match(/instagram\.com\/([a-zA-Z0-9._]+)/);
+            if (match && !usernames.has(match[1])) {
+                usernames.add(match[1]);
+                const row = table.insertRow();
+                row.innerHTML = `<td>${match[1]}</td><td><a href="${link}" target="_blank">${link}</a></td>`;
+            }
+        });
+
+        leadsTableDiv.innerHTML = '';
+        leadsTableDiv.appendChild(table);
+        totalLeadsDiv.textContent = 'Total Leads: ' + usernames.size;
+
+        // Add to keyword history
+        const history = document.getElementById('keywordHistory');
+        const li = document.createElement('li');
+        li.textContent = keyword;
+        history.appendChild(li);
+
+    } catch (err) {
+        leadsTableDiv.innerHTML = `<div class="error">Error fetching data: ${err.message}</div>`;
+    }
+}
+</script>
+
 </body>
 </html>
