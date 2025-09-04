@@ -1,6 +1,5 @@
 let leads = [];
 
-// Add keyword to baby pink search history box
 function addKeywordToHistory(keyword) {
   if (!keyword) return;
   const historyList = document.getElementById("keywordHistory");
@@ -9,29 +8,47 @@ function addKeywordToHistory(keyword) {
   historyList.appendChild(li);
 }
 
-function generateLeads() {
-  const input = document.getElementById("usernameInput").value.trim();
-  if (!input) {
-    alert("Please enter usernames or keywords.");
+async function generateLeads() {
+  const apiKey = document.getElementById("apiKeyInput").value.trim();
+  const cseId = document.getElementById("cseIdInput").value.trim();
+  const keyword = document.getElementById("keywordInput").value.trim();
+
+  if (!apiKey || !cseId || !keyword) {
+    alert("Please enter API key, CSE ID, and keyword.");
     return;
   }
 
-  addKeywordToHistory(input);
+  addKeywordToHistory(keyword);
 
   leads = [];
+  renderResults(); // clear previous results
 
-  // Split input by newlines or commas, trim whitespace
-  const usernames = input
-    .split(/[\r\n,]+/)
-    .map(u => u.trim())
-    .filter(u => u !== "");
+  try {
+    const response = await fetch(
+      `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cseId}&q=site:instagram.com+${encodeURIComponent(keyword)}`
+    );
+    const data = await response.json();
 
-  usernames.forEach(username => {
-    const profileLink = `https://www.instagram.com/${username}/`;
-    leads.push({ username, profileLink });
-  });
+    if (!data.items || data.items.length === 0) {
+      alert("No results found.");
+      return;
+    }
 
-  renderResults();
+    data.items.forEach(item => {
+      const url = item.link;
+      // Extract username from URL
+      const match = url.match(/instagram\.com\/([a-zA-Z0-9._]+)/);
+      if (match) {
+        const username = match[1];
+        leads.push({ username, profileLink: `https://www.instagram.com/${username}/` });
+      }
+    });
+
+    renderResults();
+  } catch (error) {
+    console.error("Error fetching data:", error);
+    alert("Error fetching data. Check console.");
+  }
 }
 
 function renderResults() {
