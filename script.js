@@ -18,47 +18,58 @@ async function generateLeads() {
 
     leadsTableDiv.innerHTML = 'Searching...';
 
+    const usernames = new Set();
+    const batchSize = 10; // max results per API request
+    let startIndex = 1;
+    let moreResults = true;
+
     try {
-        const query = encodeURIComponent(keyword + ' site:instagram.com');
-        const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cseId}&q=${query}&num=10`;
+        while (moreResults && startIndex <= 91) { // max start = 91 to keep total <=100
+            const query = encodeURIComponent(keyword + ' site:instagram.com');
+            const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cseId}&q=${query}&num=${batchSize}&start=${startIndex}`;
 
-        const response = await fetch(url);
-        const data = await response.json();
+            const response = await fetch(url);
+            const data = await response.json();
 
-        if (data.error) {
-            leadsTableDiv.innerHTML = `<div class="error">API Error: ${data.error.message}</div>`;
-            totalLeadsDiv.textContent = 'Total Leads: 0';
-            return;
+            if (data.error) {
+                leadsTableDiv.innerHTML = `<div class="error">API Error: ${data.error.message}</div>`;
+                return;
+            }
+
+            if (!data.items || data.items.length === 0) {
+                moreResults = false;
+                break;
+            }
+
+            data.items.forEach(item => {
+                const link = item.link;
+                const match = link.match(/instagram\.com\/([a-zA-Z0-9._]+)/);
+                if (match) usernames.add(match[1]);
+            });
+
+            // Move to next page
+            startIndex += batchSize;
         }
 
-        if (!data.items || data.items.length === 0) {
+        // Build table
+        if (usernames.size === 0) {
             leadsTableDiv.innerHTML = '<div>No results found.</div>';
             totalLeadsDiv.textContent = 'Total Leads: 0';
-            return;
-        }
+        } else {
+            const table = document.createElement('table');
+            const headerRow = table.insertRow();
+            headerRow.innerHTML = '<th>Username</th><th>Profile Link</th>';
 
-        const table = document.createElement('table');
-        const headerRow = table.insertRow();
-        headerRow.innerHTML = '<th>Username</th><th>Profile Link</th>';
-
-        const usernames = new Set();
-
-        data.items.forEach(item => {
-            const link = item.link;
-            const match = link.match(/instagram\.com\/([a-zA-Z0-9._]+)/);
-            if (match && !usernames.has(match[1])) {
-                usernames.add(match[1]);
+            usernames.forEach(username => {
                 const row = table.insertRow();
-                row.innerHTML = `<td>${match[1]}</td><td><a href="${link}" target="_blank">${link}</a></td>`;
-            }
-        });
+                row.innerHTML = `<td>${username}</td><td><a href="https://instagram.com/${username}" target="_blank">https://instagram.com/${username}</a></td>`;
+            });
 
-        leadsTableDiv.innerHTML = '';
-        leadsTableDiv.appendChild(table);
-        totalLeadsDiv.textContent = 'Total Leads: ' + usernames.size;
+            leadsTableDiv.innerHTML = '';
+            leadsTableDiv.appendChild(table);
+            totalLeadsDiv.textContent = 'Total Leads: ' + usernames.size;
 
-        // Add download CSV button
-        if (usernames.size > 0) {
+            // Add download CSV button
             const downloadBtn = document.createElement('button');
             downloadBtn.id = 'downloadCsvBtn';
             downloadBtn.textContent = 'Download CSV';
